@@ -26,9 +26,9 @@ open class TextRecognitionHelper(private val context: Context? = null) {
     }
 
     /**
-     * Extrae texto de una imagen (portada de libro)
+     * Extrae texto de una imagen (empaque de medicamento)
      *
-     * @param bitmap La imagen de la portada del libro
+     * @param bitmap La imagen del empaque del medicamento
      * @return El texto reconocido en la imagen
      */
     open suspend fun recognizeText(bitmap: Bitmap): String {
@@ -159,40 +159,40 @@ open class TextRecognitionHelper(private val context: Context? = null) {
     }
 
     /**
-     * Intenta extraer el título de un libro a partir del texto reconocido en su portada.
+     * Intenta extraer el nombre de un medicamento a partir del texto reconocido en su empaque.
      *
-     * Esta función utiliza heurísticas para identificar el título del libro:
+     * Esta función utiliza heurísticas para identificar el nombre del medicamento:
      * 1. Busca texto con fuente más grande (primeras líneas)
-     * 2. Elimina palabras comunes que suelen no ser parte del título
+     * 2. Elimina palabras comunes que suelen no ser parte del nombre
      *
      * @param recognizedText El texto completo reconocido de la imagen
-     * @return El título del libro extraído
+     * @return El nombre del medicamento extraído
      */
-    fun extractBookTitle(recognizedText: String): String {
+    fun extractMedicineName(recognizedText: String): String {
         if (recognizedText.isBlank()) return ""
 
-        val stopWords = listOf("edición", "autor", "editorial", "presenta", "colección", "volumen")
+        val stopWords = listOf("tabletas", "cápsulas", "jarabe", "mg", "ml", "unidades", "laboratorio", "fabricado", "venta", "receta")
         val lines = recognizedText.split("\n")
             .map { it.trim() }
             .filter { it.isNotBlank() && stopWords.none { stop -> it.lowercase().contains(stop) } }
 
         // Selecciona las 3 líneas más largas y las une
-        val titleLines = lines.sortedByDescending { it.length }.take(3)
-        val title = titleLines.joinToString(" ")
+        val nameLines = lines.sortedByDescending { it.length }.take(3)
+        val name = nameLines.joinToString(" ")
 
-        // Devuelve el título con formato adecuado
-        return title.replace("\\s+".toRegex(), " ").trim()
+        // Devuelve el nombre con formato adecuado
+        return name.replace("\\s+".toRegex(), " ").trim()
     }
 
     /**
-     * Extrae un posible título del libro a partir de bloques de texto seleccionados
+     * Extrae un posible nombre del medicamento a partir de bloques de texto seleccionados
      *
      * @param textBlocks Los bloques de texto seleccionados
-     * @return El título extraído de los bloques seleccionados
+     * @return El nombre extraído de los bloques seleccionados
      */
-    fun extractBookTitleFromBlocks(textBlocks: List<TextBlock>): String {
+    fun extractMedicineNameFromBlocks(textBlocks: List<TextBlock>): String {
         val text = getTextFromBlocks(textBlocks)
-        return extractBookTitle(text)
+        return extractMedicineName(text)
     }
 
 }

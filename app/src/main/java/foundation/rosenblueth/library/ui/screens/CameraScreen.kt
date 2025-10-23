@@ -47,7 +47,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import foundation.rosenblueth.library.ui.components.ErrorMessage
 import foundation.rosenblueth.library.ui.components.SelectionOverlayView
-import foundation.rosenblueth.library.ui.viewmodel.BookScannerViewModel
+import foundation.rosenblueth.library.ui.viewmodel.MedicineScannerViewModel
 import foundation.rosenblueth.library.util.TextRecognitionHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -61,7 +61,7 @@ import java.util.concurrent.Executors
 import androidx.camera.lifecycle.ProcessCameraProvider
 
 /**
- * Pantalla para escanear la portada del libro utilizando la cámara.
+ * Pantalla para escanear el empaque del medicamento utilizando la cámara.
  *
  * @param onPhotoTaken Callback que se ejecuta cuando se captura una foto
  * @param onNavigateToResults Callback para navegar a la pantalla de resultados
@@ -70,7 +70,7 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 fun CameraScreen(
     onPhotoTaken: (Bitmap) -> Unit,
     onNavigateToResults: () -> Unit,
-    viewModel: BookScannerViewModel = viewModel()
+    viewModel: MedicineScannerViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -256,7 +256,7 @@ fun CameraScreen(
                             contentDescription = "Tomar foto"
                         )
                         Text(
-                            text = "Capturar portada",
+                            text = "Capturar empaque",
                             modifier = Modifier.padding(start = 8.dp)
                         )
                     }
@@ -282,7 +282,7 @@ fun CameraScreen(
     } else {
         // Mostrar mensaje si no hay permiso de cámara
         ErrorMessage(
-            message = "Se necesita permiso de cámara para escanear libros",
+            message = "Se necesita permiso de cámara para escanear medicamentos",
             onRetry = { launcher.launch(Manifest.permission.CAMERA) }
         )
     }

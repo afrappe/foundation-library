@@ -15,22 +15,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import foundation.rosenblueth.library.data.model.BookModel
+import foundation.rosenblueth.library.data.model.MedicineModel
 import foundation.rosenblueth.library.ui.components.ErrorMessage
 import foundation.rosenblueth.library.ui.components.LoadingIndicator
 import foundation.rosenblueth.library.ui.components.SuccessMessage
-import foundation.rosenblueth.library.ui.viewmodel.BookScannerViewModel
+import foundation.rosenblueth.library.ui.viewmodel.MedicineScannerViewModel
 
 /**
- * Pantalla para mostrar y gestionar los resultados del escaneo de libros.
+ * Pantalla para mostrar y gestionar los resultados del escaneo de medicamentos.
  *
- * @param onNewScan Callback para volver a escanear una nueva portada
+ * @param onNewScan Callback para volver a escanear un nuevo empaque
  * @param viewModel ViewModel que gestiona los datos de la aplicación
  */
 @Composable
 fun ResultsScreen(
     onNewScan: () -> Unit,
-    viewModel: BookScannerViewModel
+    viewModel: MedicineScannerViewModel
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -48,7 +48,7 @@ fun ResultsScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Información del libro",
+                text = "Información del medicamento",
                 style = MaterialTheme.typography.headlineSmall
             )
 
@@ -64,9 +64,9 @@ fun ResultsScreen(
 
         // Contenido principal
         if (uiState.isLoading) {
-            LoadingIndicator(message = "Procesando información del libro...")
-        } else if (uiState.error != null && uiState.books.isEmpty()) {
-            // Solo mostrar error si no hay libros disponibles
+            LoadingIndicator(message = "Procesando información del medicamento...")
+        } else if (uiState.error != null && uiState.medicines.isEmpty()) {
+            // Solo mostrar error si no hay medicamentos disponibles
             ErrorMessage(
                 message = uiState.error ?: "Error desconocido",
                 onRetry = onNewScan
@@ -84,15 +84,15 @@ fun ResultsScreen(
                     .fillMaxWidth()
                     .padding(top = 16.dp)
             ) {
-                Text("Escanear otro libro")
+                Text("Escanear otro medicamento")
             }
         } else {
-            // Mostrar información del libro
-            BookInformationContent(
-                bookTitle = uiState.bookTitle,
-                selectedBook = uiState.selectedBook,
-                onTitleUpdate = viewModel::updateBookTitle,
-                onSendToBackend = viewModel::sendBookToBackend,
+            // Mostrar información del medicamento
+            MedicineInformationContent(
+                medicineName = uiState.medicineName,
+                selectedMedicine = uiState.selectedMedicine,
+                onNameUpdate = viewModel::updateMedicineName,
+                onSendToBackend = viewModel::sendMedicineToBackend,
                 errorMessage = uiState.error
             )
         }
@@ -100,18 +100,18 @@ fun ResultsScreen(
 }
 
 /**
- * Componente que muestra la información del libro y permite editarla
+ * Componente que muestra la información del medicamento y permite editarla
  */
 @Composable
-private fun BookInformationContent(
-    bookTitle: String,
-    selectedBook: BookModel?,
-    onTitleUpdate: (String) -> Unit,
+private fun MedicineInformationContent(
+    medicineName: String,
+    selectedMedicine: MedicineModel?,
+    onNameUpdate: (String) -> Unit,
     onSendToBackend: () -> Unit,
     errorMessage: String?
 ) {
-    var isEditingTitle by remember { mutableStateOf(false) }
-    var editedTitle by remember { mutableStateOf(bookTitle) }
+    var isEditingName by remember { mutableStateOf(false) }
+    var editedName by remember { mutableStateOf(medicineName) }
     val focusManager = LocalFocusManager.current
 
     Column(
@@ -119,7 +119,7 @@ private fun BookInformationContent(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
     ) {
-        // Campo de título (editable)
+        // Campo de nombre (editable)
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -129,31 +129,31 @@ private fun BookInformationContent(
                 modifier = Modifier.padding(16.dp)
             ) {
                 Text(
-                    text = "Título detectado:",
+                    text = "Nombre detectado:",
                     style = MaterialTheme.typography.bodyMedium
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                if (isEditingTitle) {
-                    // Campo de edición del título
+                if (isEditingName) {
+                    // Campo de edición del nombre
                     OutlinedTextField(
-                        value = editedTitle,
-                        onValueChange = { editedTitle = it },
+                        value = editedName,
+                        onValueChange = { editedName = it },
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Título del libro") },
+                        label = { Text("Nombre del medicamento") },
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                         keyboardActions = KeyboardActions(
                             onDone = {
-                                onTitleUpdate(editedTitle)
-                                isEditingTitle = false
+                                onNameUpdate(editedName)
+                                isEditingName = false
                                 focusManager.clearFocus()
                             }
                         ),
                         trailingIcon = {
                             IconButton(onClick = {
-                                onTitleUpdate(editedTitle)
-                                isEditingTitle = false
+                                onNameUpdate(editedName)
+                                isEditingName = false
                                 focusManager.clearFocus()
                             }) {
                                 Icon(Icons.Default.Send, "Guardar")
@@ -161,27 +161,27 @@ private fun BookInformationContent(
                         }
                     )
                 } else {
-                    // Mostrar título con opción para editar
+                    // Mostrar nombre con opción para editar
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = bookTitle,
+                            text = medicineName,
                             style = MaterialTheme.typography.titleLarge,
                             modifier = Modifier.weight(1f)
                         )
 
-                        IconButton(onClick = { isEditingTitle = true }) {
-                            Icon(Icons.Default.Edit, "Editar título")
+                        IconButton(onClick = { isEditingName = true }) {
+                            Icon(Icons.Default.Edit, "Editar nombre")
                         }
                     }
                 }
             }
         }
 
-        // Mostrar detalles del libro si está disponible
-        selectedBook?.let { book ->
+        // Mostrar detalles del medicamento si está disponible
+        selectedMedicine?.let { medicine ->
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -191,27 +191,39 @@ private fun BookInformationContent(
                     modifier = Modifier.padding(16.dp)
                 ) {
                     Text(
-                        text = "Información del libro:",
+                        text = "Información del medicamento:",
                         style = MaterialTheme.typography.bodyMedium
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    BookDetailItem("Autor", book.author.takeIf { it.isNotEmpty() } ?: "No disponible")
-                    BookDetailItem("Editorial", book.publisher.takeIf { it.isNotEmpty() } ?: "No disponible")
-                    BookDetailItem("Año", book.publishedYear?.toString() ?: "No disponible")
-                    BookDetailItem("ISBN", book.isbn.takeIf { it.isNotEmpty() } ?: "No disponible")
-                    BookDetailItem("Páginas", book.pages?.toString() ?: "No disponible")
-                    BookDetailItem("Idioma", book.language.takeIf { it.isNotEmpty() } ?: "No disponible")
+                    MedicineDetailItem("Principio activo", medicine.activeIngredient.takeIf { it.isNotEmpty() } ?: "No disponible")
+                    MedicineDetailItem("Fabricante", medicine.manufacturer.takeIf { it.isNotEmpty() } ?: "No disponible")
+                    MedicineDetailItem("Dosificación", medicine.dosage.takeIf { it.isNotEmpty() } ?: "No disponible")
+                    MedicineDetailItem("Forma farmacéutica", medicine.pharmaceuticalForm.takeIf { it.isNotEmpty() } ?: "No disponible")
+                    MedicineDetailItem("Registro sanitario", medicine.registrationNumber.takeIf { it.isNotEmpty() } ?: "No disponible")
 
-                    if (book.description.isNotEmpty()) {
+                    if (medicine.therapeuticIndications.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Descripción:",
+                            text = "Indicaciones terapéuticas:",
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Text(
-                            text = book.description,
+                            text = medicine.therapeuticIndications,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+
+                    if (medicine.contraindications.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Contraindicaciones:",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            text = medicine.contraindications,
                             style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.padding(top = 4.dp)
                         )
@@ -239,16 +251,16 @@ private fun BookInformationContent(
         ) {
             Icon(Icons.Default.Send, contentDescription = null)
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Enviar al catálogo")
+            Text("Enviar al registro")
         }
     }
 }
 
 /**
- * Componente que muestra un campo de detalle del libro
+ * Componente que muestra un campo de detalle del medicamento
  */
 @Composable
-private fun BookDetailItem(label: String, value: String) {
+private fun MedicineDetailItem(label: String, value: String) {
     Column(modifier = Modifier.padding(vertical = 4.dp)) {
         Text(
             text = label,

@@ -21,7 +21,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import foundation.rosenblueth.library.ui.screens.CameraScreen
 import foundation.rosenblueth.library.ui.screens.ResultsScreen
-import foundation.rosenblueth.library.ui.viewmodel.BookScannerViewModel
+import foundation.rosenblueth.library.ui.viewmodel.MedicineScannerViewModel
 
 /**
  * Actividad principal de la aplicación.
@@ -31,12 +31,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            LibraryScannerTheme {
+            MedicineScannerTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    LibraryScannerApp()
+                    MedicineScannerApp()
                 }
             }
         }
@@ -47,7 +47,7 @@ class MainActivity : ComponentActivity() {
  * Tema principal de la aplicación
  */
 @Composable
-fun LibraryScannerTheme(content: @Composable () -> Unit) {
+fun MedicineScannerTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         content = content
     )
@@ -57,11 +57,11 @@ fun LibraryScannerTheme(content: @Composable () -> Unit) {
  * Estructura principal de la aplicación con navegación
  */
 @Composable
-fun LibraryScannerApp() {
+fun MedicineScannerApp() {
     val navController = rememberNavController()
     val context = LocalContext.current
-    val viewModel: BookScannerViewModel = viewModel(
-        factory = BookScannerViewModel.Factory(context)
+    val viewModel: MedicineScannerViewModel = viewModel(
+        factory = MedicineScannerViewModel.Factory(context)
     )
     var capturedBitmap by remember { mutableStateOf<Bitmap?>(null) }
 
@@ -73,7 +73,7 @@ fun LibraryScannerApp() {
             CameraScreen(
                 onPhotoTaken = { bitmap ->
                     capturedBitmap = bitmap
-                    viewModel.processBookCover(bitmap)
+                    viewModel.processMedicinePackage(bitmap)
                 },
                 onNavigateToResults = {
                     navController.navigate("results")

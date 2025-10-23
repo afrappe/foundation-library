@@ -31,7 +31,7 @@ class TextRecognitionHelperTest {
                 1 -> throw Exception("Error en el procesamiento de imagen") // Simula error
                 2 -> "Texto muy corto" // Simula texto mínimo
                 3 -> "Línea 1\nLínea 2\nLínea 3" // Simula múltiples líneas
-                else -> "El Gran Gatsby\nF. Scott Fitzgerald\nEditorial Ejemplo" // Caso normal
+                else -> "Paracetamol\n500mg\nLaboratorio XYZ" // Caso normal
             }
         }
     }
@@ -43,38 +43,38 @@ class TextRecognitionHelperTest {
     }
 
     @Test
-    fun `extraer título de texto vacío devuelve cadena vacía`() {
+    fun `extraer nombre de texto vacío devuelve cadena vacía`() {
         // Caso límite: Texto vacío
-        val result = textRecognitionHelper.extractBookTitle("")
+        val result = textRecognitionHelper.extractMedicineName("")
         assertEquals("", result)
     }
 
     @Test
-    fun `extraer título de texto con una sola línea devuelve esa línea`() {
+    fun `extraer nombre de texto con una sola línea devuelve esa línea`() {
         // Caso límite: Una sola línea
-        val result = textRecognitionHelper.extractBookTitle("Don Quijote")
-        assertEquals("Don Quijote", result)
+        val result = textRecognitionHelper.extractMedicineName("Ibuprofeno")
+        assertEquals("Ibuprofeno", result)
     }
 
     @Test
-    fun `extraer título de texto con múltiples líneas devuelve la primera línea`() {
+    fun `extraer nombre de texto con múltiples líneas devuelve la primera línea`() {
         // Caso normal: Múltiples líneas
-        val result = textRecognitionHelper.extractBookTitle("Cien Años de Soledad\nGabriel García Márquez\nEditorial")
-        assertEquals("Cien Años de Soledad", result)
+        val result = textRecognitionHelper.extractMedicineName("Amoxicilina\n500mg\nLaboratorio ABC")
+        assertEquals("Amoxicilina", result)
     }
 
     @Test
-    fun `extraer título de texto con líneas muy cortas prioriza líneas más largas`() {
+    fun `extraer nombre de texto con líneas muy cortas prioriza líneas más largas`() {
         // Caso límite: Líneas cortas al inicio
-        val result = textRecognitionHelper.extractBookTitle("De\nLa Tierra a la Luna\nJulio Verne")
-        assertEquals("La Tierra a la Luna", result)
+        val result = textRecognitionHelper.extractMedicineName("10\nDiclofenaco Sodico\n50mg")
+        assertEquals("Diclofenaco Sodico", result)
     }
 
     @Test
-    fun `extraer título de texto con múltiples líneas largas prioriza las primeras`() {
+    fun `extraer nombre de texto con múltiples líneas largas prioriza las primeras`() {
         // Caso borde: Múltiples líneas largas
-        val result = textRecognitionHelper.extractBookTitle("El ingenioso hidalgo don Quijote de la Mancha\nMiguel de Cervantes Saavedra\nUna novela española publicada en 1605")
-        assertEquals("El ingenioso hidalgo don Quijote de la Mancha", result)
+        val result = textRecognitionHelper.extractMedicineName("Acetilcisteína Solución Oral\nIndicado para afecciones respiratorias\nConcentración 200mg por 5ml")
+        assertEquals("Acetilcisteína Solución Oral", result)
     }
 
     @Test
@@ -89,7 +89,7 @@ class TextRecognitionHelperTest {
 
             // Verificar
             assertTrue(result.isNotEmpty())
-            assertTrue(result.contains("El Gran Gatsby"))
+            assertTrue(result.contains("Paracetamol"))
         } catch (e: Exception) {
             fail("No debería lanzar excepciones con una imagen válida")
         }

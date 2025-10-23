@@ -1,73 +1,73 @@
 package foundation.rosenblueth.library.data.network
 
-import foundation.rosenblueth.library.data.model.BookModel
+import foundation.rosenblueth.library.data.model.MedicineModel
 import retrofit2.Response
 import retrofit2.http.GET
 import retrofit2.http.Query
 
 /**
- * Interface para las APIs de servicios de catalogación de libros
+ * Interface para las APIs de servicios de catalogación de medicamentos
  */
-interface BookCatalogApiService {
+interface MedicineCatalogApiService {
     /**
-     * Busca información de libro en OCLC (WorldCat)
-     * @param title El título del libro a buscar
-     * @return Respuesta con la información del libro
+     * Busca información de medicamento en base de datos farmacéutica
+     * @param name El nombre del medicamento a buscar
+     * @return Respuesta con la información del medicamento
      */
-    @GET("search/worldcat/search")
-    suspend fun searchBookByTitle(@Query("q") title: String): Response<BookSearchResponse>
+    @GET("search/medicine/search")
+    suspend fun searchMedicineByName(@Query("q") name: String): Response<MedicineSearchResponse>
 
     /**
-     * Busca información de libro en Library of Congress
-     * @param title El título del libro a buscar
-     * @return Respuesta con la información del libro
+     * Busca información de medicamento en base de datos alternativa
+     * @param name El nombre del medicamento a buscar
+     * @return Respuesta con la información del medicamento
      */
-    @GET("search/loc/search")
-    suspend fun searchBookInLOC(@Query("q") title: String): Response<BookSearchResponse>
+    @GET("search/alternative/search")
+    suspend fun searchMedicineAlternative(@Query("q") name: String): Response<MedicineSearchResponse>
 
     /**
-     * Búsqueda de libros por título en Library of Congress
-     * @param query El título o términos de búsqueda
+     * Búsqueda de medicamentos por nombre
+     * @param query El nombre o términos de búsqueda
      * @param format El formato de respuesta (json)
-     * @param filter Filtrar por tipo de contenido (books)
-     * @return Respuesta con información de libros encontrados
+     * @param filter Filtrar por tipo de contenido (medicines)
+     * @return Respuesta con información de medicamentos encontrados
      */
     @GET("search/")
-    suspend fun searchBooks(
+    suspend fun searchMedicines(
         @Query("q") query: String,
         @Query("fo") format: String = "json",
-        @Query("at") filter: String = "books"
+        @Query("at") filter: String = "medicines"
     ): Response<LocResponse>
 }
 
 /**
- * Modelo de respuesta de la búsqueda de libros
+ * Modelo de respuesta de la búsqueda de medicamentos
  */
-data class BookSearchResponse(
-    val items: List<BookResponseItem> = emptyList(),
+data class MedicineSearchResponse(
+    val items: List<MedicineResponseItem> = emptyList(),
     val totalItems: Int = 0,
     val status: String = "",
     val error: String? = null
 )
 
 /**
- * Modelo que representa un ítem de libro en la respuesta de la API
+ * Modelo que representa un ítem de medicamento en la respuesta de la API
  */
-data class BookResponseItem(
-    val title: String,
-    val authors: List<String> = emptyList(),
-    val publisher: String = "",
-    val publishedDate: String = "",
-    val description: String = "",
-    val isbn: List<String> = emptyList(),
-    val pageCount: Int? = null,
-    val categories: List<String> = emptyList(),
-    val language: String = "",
-    val imageLinks: ImageLinks? = null
+data class MedicineResponseItem(
+    val name: String,
+    val activeIngredient: String = "",
+    val manufacturer: String = "",
+    val dosage: String = "",
+    val pharmaceuticalForm: String = "",
+    val therapeuticIndications: String = "",
+    val contraindications: String = "",
+    val sideEffects: String = "",
+    val registrationNumber: String = "",
+    val packageImageUrl: String = ""
 )
 
 /**
- * Enlaces a imágenes de portada
+ * Enlaces a imágenes del empaque
  */
 data class ImageLinks(
     val smallThumbnail: String = "",
@@ -79,17 +79,17 @@ data class ImageLinks(
 /**
  * Extensión para convertir la respuesta de la API a nuestro modelo de datos
  */
-fun BookResponseItem.toBookModel(): BookModel {
-    return BookModel(
-        title = this.title,
-        author = this.authors.joinToString(", "),
-        isbn = this.isbn.firstOrNull() ?: "",
-        publisher = this.publisher,
-        publishedYear = this.publishedDate.split("-").firstOrNull()?.toIntOrNull(),
-        pages = this.pageCount,
-        subjects = this.categories,
-        language = this.language,
-        description = this.description,
-        coverImageUrl = this.imageLinks?.thumbnail ?: ""
+fun MedicineResponseItem.toMedicineModel(): MedicineModel {
+    return MedicineModel(
+        name = this.name,
+        activeIngredient = this.activeIngredient,
+        manufacturer = this.manufacturer,
+        dosage = this.dosage,
+        pharmaceuticalForm = this.pharmaceuticalForm,
+        therapeuticIndications = this.therapeuticIndications,
+        contraindications = this.contraindications,
+        sideEffects = this.sideEffects,
+        registrationNumber = this.registrationNumber,
+        packageImageUrl = this.packageImageUrl
     )
 }

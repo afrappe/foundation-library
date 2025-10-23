@@ -12,7 +12,7 @@ import java.util.concurrent.TimeUnit
  */
 object RetrofitClient {
     // URLs de las APIs disponibles
-    private const val LOC_BASE_URL = "https://www.loc.gov/"
+    private const val MEDICINE_BASE_URL = "https://api.fda.gov/"
 
     private val gson = GsonBuilder()
         .setLenient()
@@ -32,14 +32,14 @@ object RetrofitClient {
     // Este método podría ser extendido para manejar múltiples endpoints o autenticación
     private fun buildRetrofit(): Retrofit {
         return Retrofit.Builder()
-            .baseUrl(LOC_BASE_URL)
+            .baseUrl(MEDICINE_BASE_URL)
             .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create(gson))
             .build()
     }
 
-    // Servicio para buscar libros en la Biblioteca del Congreso (loc.gov)
-    val bookApiService: BookCatalogApiService by lazy {
-        buildRetrofit().create(BookCatalogApiService::class.java)
+    // Servicio para buscar medicamentos en bases de datos farmacéuticas
+    val medicineApiService: MedicineCatalogApiService by lazy {
+        buildRetrofit().create(MedicineCatalogApiService::class.java)
     }
 }

@@ -5,8 +5,8 @@ import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import foundation.rosenblueth.library.data.model.BookModel
-import foundation.rosenblueth.library.data.repository.BookRepository
+import foundation.rosenblueth.library.data.model.MedicineModel
+import foundation.rosenblueth.library.data.repository.MedicineRepository
 import foundation.rosenblueth.library.util.TextRecognitionHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,24 +15,24 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * ViewModel para la funcionalidad de escaneo y búsqueda de libros
+ * ViewModel para la funcionalidad de escaneo y búsqueda de medicamentos
  */
-open class BookScannerViewModel(private val appContext: Context? = null) : ViewModel() {
-    protected open val bookRepositoryInstance: BookRepository = BookRepository()
+open class MedicineScannerViewModel(private val appContext: Context? = null) : ViewModel() {
+    protected open val medicineRepositoryInstance: MedicineRepository = MedicineRepository()
     protected open val textRecognitionHelperInstance: TextRecognitionHelper = TextRecognitionHelper(appContext)
 
     // Referencias para mantener compatibilidad
-    private val bookRepository get() = bookRepositoryInstance
+    private val medicineRepository get() = medicineRepositoryInstance
     private val textRecognitionHelper get() = textRecognitionHelperInstance
 
     // Estado para la UI
-    private val _uiState = MutableStateFlow(BookScannerUiState())
-    val uiState: StateFlow<BookScannerUiState> = _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow(MedicineScannerUiState())
+    val uiState: StateFlow<MedicineScannerUiState> = _uiState.asStateFlow()
 
     /**
-     * Procesa la imagen capturada para extraer el título y buscar información del libro
+     * Procesa la imagen capturada para extraer el nombre y buscar información del medicamento
      */
-    fun processBookCover(bitmap: Bitmap) {
+    fun processMedicinePackage(bitmap: Bitmap) {
         viewModelScope.launch {
             try {
                 _uiState.update { it.copy(isLoading = true, error = null) }
@@ -40,24 +40,24 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
                 // Paso 1: Reconocer texto de la imagen
                 val recognizedText = textRecognitionHelper.recognizeText(bitmap)
 
-                // Paso 2: Extraer el título del libro
-                val bookTitle = textRecognitionHelper.extractBookTitle(recognizedText)
+                // Paso 2: Extraer el nombre del medicamento
+                val medicineName = textRecognitionHelper.extractMedicineName(recognizedText)
 
                 _uiState.update {
                     it.copy(
                         recognizedText = recognizedText,
-                        bookTitle = bookTitle
+                        medicineName = medicineName
                     )
                 }
 
-                // Si se encontró un título, buscar información del libro
-                if (bookTitle.isNotEmpty()) {
-                    searchBookInfo(bookTitle)
+                // Si se encontró un nombre, buscar información del medicamento
+                if (medicineName.isNotEmpty()) {
+                    searchMedicineInfo(medicineName)
                 } else {
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            error = "No se pudo detectar el título del libro"
+                            error = "No se pudo detectar el nombre del medicamento"
                         )
                     }
                 }
@@ -74,44 +74,44 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
     }
 
     /**
-     * Busca información del libro usando el título reconocido
+     * Busca información del medicamento usando el nombre reconocido
      */
-    private fun searchBookInfo(title: String) {
+    private fun searchMedicineInfo(name: String) {
         viewModelScope.launch {
             try {
-                val result = bookRepository.searchBookByTitle(title)
+                val result = medicineRepository.searchMedicineByName(name)
 
                 result.fold(
-                    onSuccess = { books ->
-                        if (books.isNotEmpty()) {
+                    onSuccess = { medicines ->
+                        if (medicines.isNotEmpty()) {
                             _uiState.update {
                                 it.copy(
                                     isLoading = false,
-                                    books = books,
-                                    selectedBook = books.first()
+                                    medicines = medicines,
+                                    selectedMedicine = medicines.first()
                                 )
                             }
                         } else {
-                            // Si no se encontraron libros, crear uno con solo el título
-                            val basicBook = BookModel.createWithTitle(title)
+                            // Si no se encontraron medicamentos, crear uno con solo el nombre
+                            val basicMedicine = MedicineModel.createWithName(name)
                             _uiState.update {
                                 it.copy(
                                     isLoading = false,
-                                    books = listOf(basicBook),
-                                    selectedBook = basicBook
+                                    medicines = listOf(basicMedicine),
+                                    selectedMedicine = basicMedicine
                                 )
                             }
                         }
                     },
                     onFailure = { error ->
-                        // Si hay un error en la búsqueda, crear libro básico con el título
-                        val basicBook = BookModel.createWithTitle(title)
+                        // Si hay un error en la búsqueda, crear medicamento básico con el nombre
+                        val basicMedicine = MedicineModel.createWithName(name)
                         _uiState.update {
                             it.copy(
                                 isLoading = false,
                                 error = "Error al buscar información: ${error.message}",
-                                books = listOf(basicBook),
-                                selectedBook = basicBook
+                                medicines = listOf(basicMedicine),
+                                selectedMedicine = basicMedicine
                             )
                         }
                     }
@@ -121,7 +121,7 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        error = "Error al buscar información del libro: ${e.message}"
+                        error = "Error al buscar información del medicamento: ${e.message}"
                     )
                 }
             }
@@ -129,41 +129,41 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
     }
 
     /**
-     * Selecciona un libro de la lista de resultados
+     * Selecciona un medicamento de la lista de resultados
      */
-    fun selectBook(book: BookModel) {
-        _uiState.update { it.copy(selectedBook = book) }
+    fun selectMedicine(medicine: MedicineModel) {
+        _uiState.update { it.copy(selectedMedicine = medicine) }
     }
 
     /**
-     * Actualiza manualmente el título del libro
+     * Actualiza manualmente el nombre del medicamento
      */
-    fun updateBookTitle(title: String) {
-        _uiState.update { it.copy(bookTitle = title) }
+    fun updateMedicineName(name: String) {
+        _uiState.update { it.copy(medicineName = name) }
 
-        // Volver a buscar con el nuevo título
-        if (title.isNotEmpty()) {
-            searchBookInfo(title)
+        // Volver a buscar con el nuevo nombre
+        if (name.isNotEmpty()) {
+            searchMedicineInfo(name)
         }
     }
 
     /**
-     * Envía los datos del libro seleccionado al backend
+     * Envía los datos del medicamento seleccionado al backend
      */
-    fun sendBookToBackend() {
+    fun sendMedicineToBackend() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, successMessage = null, error = null) }
 
-            uiState.value.selectedBook?.let { book ->
+            uiState.value.selectedMedicine?.let { medicine ->
                 try {
-                    val result = bookRepository.sendBookToBackend(book)
+                    val result = medicineRepository.sendMedicineToBackend(medicine)
 
                     result.fold(
                         onSuccess = {
                             _uiState.update {
                                 it.copy(
                                     isLoading = false,
-                                    successMessage = "Libro enviado correctamente al backend"
+                                    successMessage = "Medicamento enviado correctamente al backend"
                                 )
                             }
                         },
@@ -171,7 +171,7 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
                             _uiState.update {
                                 it.copy(
                                     isLoading = false,
-                                    error = "Error al enviar libro: ${error.message}"
+                                    error = "Error al enviar medicamento: ${error.message}"
                                 )
                             }
                         }
@@ -180,7 +180,7 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            error = "Error al enviar libro: ${e.message}"
+                            error = "Error al enviar medicamento: ${e.message}"
                         )
                     }
                 }
@@ -188,7 +188,7 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        error = "No hay libro seleccionado para enviar"
+                        error = "No hay medicamento seleccionado para enviar"
                     )
                 }
             }
@@ -199,7 +199,7 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
      * Reinicia el proceso de escaneo
      */
     fun resetScanProcess() {
-        _uiState.update { BookScannerUiState() }
+        _uiState.update { MedicineScannerUiState() }
     }
 
     /**
@@ -208,8 +208,8 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
     class Factory(private val context: Context) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            if (modelClass.isAssignableFrom(BookScannerViewModel::class.java)) {
-                return BookScannerViewModel(context.applicationContext) as T
+            if (modelClass.isAssignableFrom(MedicineScannerViewModel::class.java)) {
+                return MedicineScannerViewModel(context.applicationContext) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class")
         }
@@ -217,14 +217,14 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
 }
 
 /**
- * Estado de la UI para la funcionalidad de escaneo de libros
+ * Estado de la UI para la funcionalidad de escaneo de medicamentos
  */
-data class BookScannerUiState(
+data class MedicineScannerUiState(
     val isLoading: Boolean = false,
     val recognizedText: String = "",
-    val bookTitle: String = "",
-    val books: List<BookModel> = emptyList(),
-    val selectedBook: BookModel? = null,
+    val medicineName: String = "",
+    val medicines: List<MedicineModel> = emptyList(),
+    val selectedMedicine: MedicineModel? = null,
     val error: String? = null,
     val successMessage: String? = null
 )

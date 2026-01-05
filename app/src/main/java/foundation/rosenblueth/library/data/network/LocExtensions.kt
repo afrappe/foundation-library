@@ -26,6 +26,9 @@ fun LocItem.toBookModel(): BookModel {
         publishedYear = year,
         subjects = subjects,
         language = languageValue,
-        description = descriptionValue
+        description = descriptionValue,
+        lcClassification = classification.lc.firstOrNull() ?: "",
+        deweyClassification = classification.dewey.firstOrNull() ?: "",
+        dcuClassification = classification.dcu.firstOrNull() ?: ""
     )
 }

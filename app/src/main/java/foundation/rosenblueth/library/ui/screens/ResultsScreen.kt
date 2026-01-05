@@ -7,6 +7,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,11 +26,13 @@ import foundation.rosenblueth.library.ui.viewmodel.BookScannerViewModel
  * Pantalla para mostrar y gestionar los resultados del escaneo de libros.
  *
  * @param onNewScan Callback para volver a escanear una nueva portada
+ * @param onNavigateToLibrary Callback para navegar a Mi Biblioteca
  * @param viewModel ViewModel que gestiona los datos de la aplicación
  */
 @Composable
 fun ResultsScreen(
     onNewScan: () -> Unit,
+    onNavigateToLibrary: () -> Unit,
     viewModel: BookScannerViewModel
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -52,11 +55,26 @@ fun ResultsScreen(
                 style = MaterialTheme.typography.headlineSmall
             )
 
-            Button(onClick = {
-                viewModel.resetScanProcess()
-                onNewScan()
-            }) {
-                Text("Nuevo escaneo")
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Botón para ir a Mi Biblioteca
+                Button(onClick = onNavigateToLibrary) {
+                    Icon(
+                        Icons.Default.LibraryBooks,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Mi Biblioteca")
+                }
+                
+                Button(onClick = {
+                    viewModel.resetScanProcess()
+                    onNewScan()
+                }) {
+                    Text("Nuevo escaneo")
+                }
             }
         }
 
@@ -74,17 +92,31 @@ fun ResultsScreen(
         } else if (uiState.successMessage != null) {
             SuccessMessage(message = uiState.successMessage ?: "")
 
-            // Botón para volver a escanear después de éxito
-            Button(
-                onClick = {
-                    viewModel.resetScanProcess()
-                    onNewScan()
-                },
+            // Botones para volver a escanear o ir a la biblioteca después de éxito
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 16.dp)
+                    .padding(top = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("Escanear otro libro")
+                Button(
+                    onClick = onNavigateToLibrary,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Default.LibraryBooks, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Ver Mi Biblioteca")
+                }
+                
+                Button(
+                    onClick = {
+                        viewModel.resetScanProcess()
+                        onNewScan()
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Escanear otro libro")
+                }
             }
         } else {
             // Mostrar información del libro
@@ -203,6 +235,17 @@ private fun BookInformationContent(
                     BookDetailItem("ISBN", book.isbn.takeIf { it.isNotEmpty() } ?: "No disponible")
                     BookDetailItem("Páginas", book.pages?.toString() ?: "No disponible")
                     BookDetailItem("Idioma", book.language.takeIf { it.isNotEmpty() } ?: "No disponible")
+                    
+                    // Clasificaciones
+                    if (book.lcClassification.isNotEmpty()) {
+                        BookDetailItem("Clasificación LC", book.lcClassification)
+                    }
+                    if (book.deweyClassification.isNotEmpty()) {
+                        BookDetailItem("Clasificación Dewey", book.deweyClassification)
+                    }
+                    if (book.dcuClassification.isNotEmpty()) {
+                        BookDetailItem("Clasificación DCU", book.dcuClassification)
+                    }
 
                     if (book.description.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(8.dp))

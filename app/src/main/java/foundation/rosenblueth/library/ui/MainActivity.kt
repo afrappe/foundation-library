@@ -20,6 +20,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import foundation.rosenblueth.library.ui.screens.CameraScreen
+import foundation.rosenblueth.library.ui.screens.LibraryScreen
 import foundation.rosenblueth.library.ui.screens.ResultsScreen
 import foundation.rosenblueth.library.ui.viewmodel.BookScannerViewModel
 
@@ -89,7 +90,18 @@ fun LibraryScannerApp() {
                         popUpTo("camera") { inclusive = true }
                     }
                 },
+                onNavigateToLibrary = {
+                    navController.navigate("library")
+                },
                 viewModel = viewModel
+            )
+        }
+        
+        composable("library") {
+            LibraryScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
             )
         }
     }

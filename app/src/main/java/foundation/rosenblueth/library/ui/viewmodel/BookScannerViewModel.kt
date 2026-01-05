@@ -6,7 +6,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import foundation.rosenblueth.library.data.model.BookModel
+import foundation.rosenblueth.library.data.model.CaptureData
 import foundation.rosenblueth.library.data.repository.BookRepository
+import foundation.rosenblueth.library.data.store.CaptureDataStore
 import foundation.rosenblueth.library.util.TextRecognitionHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +22,7 @@ import kotlinx.coroutines.launch
 open class BookScannerViewModel(private val appContext: Context? = null) : ViewModel() {
     protected open val bookRepositoryInstance: BookRepository = BookRepository()
     protected open val textRecognitionHelperInstance: TextRecognitionHelper = TextRecognitionHelper(appContext)
+    private val captureDataStore: CaptureDataStore? = appContext?.let { CaptureDataStore(it) }
 
     // Referencias para mantener compatibilidad
     private val bookRepository get() = bookRepositoryInstance
@@ -148,7 +151,7 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
     }
 
     /**
-     * Envía los datos del libro seleccionado al backend
+     * Envía los datos del libro seleccionado al backend y lo guarda en la biblioteca
      */
     fun sendBookToBackend() {
         viewModelScope.launch {
@@ -160,10 +163,14 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
 
                     result.fold(
                         onSuccess = {
+                            // Guardar en la biblioteca local
+                            val captureData = CaptureData.fromBookModel(book)
+                            captureDataStore?.saveCapturedBook(captureData)
+                            
                             _uiState.update {
                                 it.copy(
                                     isLoading = false,
-                                    successMessage = "Libro enviado correctamente al backend"
+                                    successMessage = "Libro enviado correctamente al backend y guardado en la biblioteca"
                                 )
                             }
                         },

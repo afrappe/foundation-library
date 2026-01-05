@@ -24,7 +24,9 @@ data class LocItem(
     val locationUrl: String = "",
     @SerializedName("id")
     val locId: String = "",
-    val isbn: List<String> = listOf()
+    val isbn: List<String> = listOf(),
+    @SerializedName("classification")
+    val classification: LocClassification = LocClassification()
 )
 
 data class LocPagination(
@@ -37,4 +39,10 @@ data class LocPagination(
 data class LocSearchInfo(
     val query: String = "",
     val totalItems: Int = 0
+)
+
+data class LocClassification(
+    val lc: List<String> = listOf(),  // Library of Congress Classification
+    val dewey: List<String> = listOf(),  // Dewey Decimal Classification
+    val dcu: List<String> = listOf()  // DCU Classification
 )

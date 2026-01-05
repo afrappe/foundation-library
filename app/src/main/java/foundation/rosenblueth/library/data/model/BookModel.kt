@@ -13,7 +13,10 @@ data class BookModel(
     val subjects: List<String> = emptyList(),
     val language: String = "",
     val description: String = "",
-    val coverImageUrl: String = ""
+    val coverImageUrl: String = "",
+    val lcClassification: String = "",  // Library of Congress Classification
+    val deweyClassification: String = "",  // Dewey Decimal Classification
+    val dcuClassification: String = ""  // DCU Classification
 ) {
     companion object {
         /**

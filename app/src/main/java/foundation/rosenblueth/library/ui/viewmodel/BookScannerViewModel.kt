@@ -80,6 +80,45 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
     }
 
     /**
+     * Procesa la imagen capturada para una sección específica.
+     * Extrae el texto y lo asigna automáticamente a la sección correspondiente.
+     */
+    fun processSectionImage(bitmap: Bitmap, sectionType: String) {
+        viewModelScope.launch {
+            try {
+                _uiState.update { it.copy(isLoading = true, error = null) }
+
+                // Reconocer texto de la imagen
+                val recognizedText = textRecognitionHelper.recognizeText(bitmap)
+
+                // Extraer el texto más relevante
+                val extractedText = textRecognitionHelper.extractBookTitle(recognizedText)
+
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        recognizedText = recognizedText,
+                        bookTitle = extractedText
+                    )
+                }
+
+                // Actualizar la sección correspondiente con el texto extraído
+                if (extractedText.isNotEmpty()) {
+                    updateSectionValue(sectionType, extractedText)
+                }
+
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = "Error al procesar la imagen: ${e.message}"
+                    )
+                }
+            }
+        }
+    }
+
+    /**
      * Establece el modo de escaneo actual
      */
     fun setScanMode(mode: ScanMode) {
@@ -287,6 +326,29 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
                     it.copy(
                         isLoading = false,
                         error = "Error al procesar la imagen: ${e.message}"
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Busca información del libro usando un código ISBN escaneado directamente.
+     * Esta función se usa con el escáner de códigos de barras.
+     */
+    fun searchBookByScannedISBN(isbn: String) {
+        viewModelScope.launch {
+            try {
+                _uiState.update { it.copy(isLoading = true, error = null) }
+
+                // Buscar información del libro por ISBN
+                searchBookByISBN(isbn)
+
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = "Error al buscar libro por ISBN: ${e.message}"
                     )
                 }
             }

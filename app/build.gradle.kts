@@ -91,6 +91,9 @@ dependencies {
     // ML Kit for text recognition
     implementation("com.google.mlkit:text-recognition:16.0.0")
 
+    // ML Kit for barcode scanning (ISBN)
+    implementation("com.google.mlkit:barcode-scanning:17.2.0")
+
     // Retrofit for network calls
     implementation("com.squareup.retrofit2:retrofit:2.10.0")
     implementation("com.squareup.retrofit2:converter-gson:2.10.0")

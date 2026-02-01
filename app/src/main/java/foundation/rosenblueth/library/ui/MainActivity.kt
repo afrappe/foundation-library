@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -16,6 +17,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import foundation.rosenblueth.library.ui.model.ScanMode
+import foundation.rosenblueth.library.ui.screens.BarcodeScannerScreen
 import foundation.rosenblueth.library.ui.screens.CameraScreen
 import foundation.rosenblueth.library.ui.screens.LibraryScreen
 import foundation.rosenblueth.library.ui.screens.ResultsScreen
@@ -106,30 +108,34 @@ fun LibraryScannerApp() {
             val sectionTypeName = backStackEntry.arguments?.getString("sectionType") ?: ""
             val uiState by viewModel.uiState.collectAsState()
 
+            // Detectar cuando termina el procesamiento para navegar de regreso
+            LaunchedEffect(uiState.isLoading) {
+                // Cuando termina de cargar (isLoading pasa de true a false)
+                // y hay texto reconocido, navegar de regreso
+            }
+
             CameraScreen(
                 onPhotoTaken = { bitmap ->
-                    viewModel.processBookCover(bitmap)
+                    // Usar la nueva función que procesa y actualiza la sección automáticamente
+                    viewModel.processSectionImage(bitmap, sectionTypeName)
                 },
                 onNavigateToResults = {
-                    // Obtener el texto reconocido y actualizar la sección correspondiente
-                    val recognizedText = uiState.bookTitle
-                    if (recognizedText.isNotEmpty()) {
-                        viewModel.updateSectionValue(sectionTypeName, recognizedText)
-                    }
+                    // Navegar de regreso a secciones
                     navController.popBackStack()
                 },
                 viewModel = viewModel
             )
         }
 
-        // Cámara para escaneo de ISBN
+        // Escáner de códigos de barras para ISBN
         composable("camera/isbn") {
-            CameraScreen(
-                onPhotoTaken = { bitmap ->
-                    viewModel.processBookISBN(bitmap)
-                },
-                onNavigateToResults = {
+            BarcodeScannerScreen(
+                onBarcodeDetected = { isbn ->
+                    viewModel.searchBookByScannedISBN(isbn)
                     navController.navigate("results")
+                },
+                onNavigateBack = {
+                    navController.popBackStack()
                 },
                 viewModel = viewModel
             )

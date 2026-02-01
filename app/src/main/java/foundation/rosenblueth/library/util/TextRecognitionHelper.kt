@@ -195,6 +195,53 @@ open class TextRecognitionHelper(private val context: Context? = null) {
         return extractBookTitle(text)
     }
 
+    /**
+     * Intenta extraer el ISBN de un libro a partir del texto reconocido.
+     *
+     * Esta función busca patrones de ISBN-10 e ISBN-13 en el texto:
+     * - ISBN-10: 10 dígitos (puede incluir X como último dígito)
+     * - ISBN-13: 13 dígitos que típicamente empiezan con 978 o 979
+     *
+     * @param recognizedText El texto completo reconocido de la imagen
+     * @return El ISBN extraído (sin guiones ni espacios) o cadena vacía si no se encuentra
+     */
+    fun extractISBN(recognizedText: String): String {
+        if (recognizedText.isBlank()) return ""
+
+        // Patrón para ISBN-13: exactamente 13 dígitos (puede incluir guiones o espacios como separadores)
+        val isbn13Pattern = Regex("""(?:ISBN(?:-13)?:?\s*)?(\d(?:[-\s]?\d){12})""", RegexOption.IGNORE_CASE)
+        
+        // Patrón para ISBN-10: exactamente 10 caracteres (9 dígitos + dígito/X, puede incluir guiones o espacios)
+        val isbn10Pattern = Regex("""(?:ISBN(?:-10)?:?\s*)?(\d(?:[-\s]?\d){8}[-\s]?[\dX])""", RegexOption.IGNORE_CASE)
+
+        // Obtener todas las coincidencias y validarlas
+        val allMatches = mutableListOf<String>()
+        
+        // Buscar ISBN-13 primero (más común actualmente)
+        isbn13Pattern.findAll(recognizedText).forEach { match ->
+            val isbn = match.groupValues[1].replace(Regex("[-\\s]"), "")
+            if (isbn.length == 13 && isbn.all { it.isDigit() }) {
+                allMatches.add(isbn)
+            }
+        }
+        
+        // Si encontramos ISBN-13, retornamos el primero
+        if (allMatches.isNotEmpty()) {
+            return allMatches.first()
+        }
+
+        // Si no se encuentra ISBN-13, buscar ISBN-10
+        isbn10Pattern.findAll(recognizedText).forEach { match ->
+            val isbn = match.groupValues[1].replace(Regex("[-\\s]"), "")
+            if (isbn.length == 10 && isbn.take(9).all { it.isDigit() } && isbn.last() in "0123456789X") {
+                allMatches.add(isbn)
+            }
+        }
+        
+        // Retornar el primer ISBN-10 válido si se encontró
+        return allMatches.firstOrNull() ?: ""
+    }
+
 }
 
 /**

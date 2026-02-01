@@ -40,6 +40,33 @@ open class BookRepository {
     }
 
     /**
+     * Busca información de un libro por ISBN en la Biblioteca del Congreso (LOC).
+     *
+     * @param isbn El ISBN del libro a buscar (ISBN-10 o ISBN-13)
+     * @return Una lista de modelos de libros que coinciden con la búsqueda
+     */
+    suspend fun searchBookByISBN(isbn: String): Result<List<BookModel>> {
+        return withContext(Dispatchers.IO) {
+            try {
+                // Buscar en la API de la Biblioteca del Congreso usando el ISBN
+                val response = bookApiService.searchBooks(query = isbn)
+
+                if (response.isSuccessful && response.body() != null) {
+                    val locResponse = response.body()!!
+                    // Convertir los resultados al modelo de libro de la aplicación
+                    val books = locResponse.items.map { it.toBookModel() }
+                    // Devolver la lista de libros (puede estar vacía)
+                    Result.success(books)
+                } else {
+                    Result.failure(Exception("Error en la búsqueda por ISBN: ${response.code()} ${response.message()}"))
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+    }
+
+    /**
      * Envía los datos del libro al backend
      *
      * @param book El modelo de libro a enviar

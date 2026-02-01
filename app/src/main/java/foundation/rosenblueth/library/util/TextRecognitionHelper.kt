@@ -208,11 +208,11 @@ open class TextRecognitionHelper(private val context: Context? = null) {
     fun extractISBN(recognizedText: String): String {
         if (recognizedText.isBlank()) return ""
 
-        // Patrón para ISBN-13 (13 dígitos, puede incluir guiones o espacios)
-        val isbn13Pattern = Regex("""(?:ISBN(?:-13)?:?\s*)?(\d{3}[-\s]?\d{1,5}[-\s]?\d{1,7}[-\s]?\d{1,7}[-\s]?\d)""", RegexOption.IGNORE_CASE)
+        // Patrón para ISBN-13: exactamente 13 dígitos (puede incluir guiones o espacios como separadores)
+        val isbn13Pattern = Regex("""(?:ISBN(?:-13)?:?\s*)?(\d(?:[-\s]?\d){12})""", RegexOption.IGNORE_CASE)
         
-        // Patrón para ISBN-10 (10 dígitos o 9 dígitos + X, puede incluir guiones o espacios)
-        val isbn10Pattern = Regex("""(?:ISBN(?:-10)?:?\s*)?(\d{1,5}[-\s]?\d{1,7}[-\s]?\d{1,7}[-\s]?[\dX])""", RegexOption.IGNORE_CASE)
+        // Patrón para ISBN-10: exactamente 10 caracteres (9 dígitos + dígito/X, puede incluir guiones o espacios)
+        val isbn10Pattern = Regex("""(?:ISBN(?:-10)?:?\s*)?(\d(?:[-\s]?\d){8}[-\s]?[\dX])""", RegexOption.IGNORE_CASE)
 
         // Obtener todas las coincidencias y validarlas
         val allMatches = mutableListOf<String>()
@@ -233,7 +233,7 @@ open class TextRecognitionHelper(private val context: Context? = null) {
         // Si no se encuentra ISBN-13, buscar ISBN-10
         isbn10Pattern.findAll(recognizedText).forEach { match ->
             val isbn = match.groupValues[1].replace(Regex("[-\\s]"), "")
-            if (isbn.length == 10 && (isbn.take(9).all { it.isDigit() } && (isbn.last().isDigit() || isbn.last() == 'X'))) {
+            if (isbn.length == 10 && isbn.take(9).all { it.isDigit() } && isbn.last() in "0123456789X") {
                 allMatches.add(isbn)
             }
         }

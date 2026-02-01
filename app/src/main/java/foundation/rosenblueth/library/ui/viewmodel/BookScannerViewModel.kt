@@ -194,7 +194,7 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
                             }
                         } else {
                             // Si no se encontraron libros, crear uno con solo el ISBN
-                            val basicBook = BookModel(title = "", isbn = isbn)
+                            val basicBook = createBasicBookWithISBN(isbn)
                             _uiState.update {
                                 it.copy(
                                     isLoading = false,
@@ -206,7 +206,7 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
                     },
                     onFailure = { error ->
                         // Si hay un error en la búsqueda, crear libro básico con el ISBN
-                        val basicBook = BookModel(title = "", isbn = isbn)
+                        val basicBook = createBasicBookWithISBN(isbn)
                         _uiState.update {
                             it.copy(
                                 isLoading = false,
@@ -227,6 +227,13 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
                 }
             }
         }
+    }
+
+    /**
+     * Crea un modelo de libro básico con solo el ISBN
+     */
+    private fun createBasicBookWithISBN(isbn: String): BookModel {
+        return BookModel(title = "Libro sin título", isbn = isbn)
     }
 
     /**

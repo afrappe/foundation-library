@@ -77,6 +77,49 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
     }
 
     /**
+     * Procesa la imagen capturada para extraer el ISBN y buscar información del libro
+     */
+    fun processBookISBN(bitmap: Bitmap) {
+        viewModelScope.launch {
+            try {
+                _uiState.update { it.copy(isLoading = true, error = null) }
+
+                // Paso 1: Reconocer texto de la imagen
+                val recognizedText = textRecognitionHelper.recognizeText(bitmap)
+
+                // Paso 2: Extraer el ISBN del libro
+                val isbn = textRecognitionHelper.extractISBN(recognizedText)
+
+                _uiState.update {
+                    it.copy(
+                        recognizedText = recognizedText
+                    )
+                }
+
+                // Si se encontró un ISBN, buscar información del libro
+                if (isbn.isNotEmpty()) {
+                    searchBookByISBN(isbn)
+                } else {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            error = "No se pudo detectar el ISBN del libro"
+                        )
+                    }
+                }
+
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = "Error al procesar la imagen: ${e.message}"
+                    )
+                }
+            }
+        }
+    }
+
+    /**
      * Busca información del libro usando el título reconocido
      */
     private fun searchBookInfo(title: String) {
@@ -125,6 +168,61 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
                     it.copy(
                         isLoading = false,
                         error = "Error al buscar información del libro: ${e.message}"
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Busca información del libro usando el ISBN reconocido
+     */
+    private fun searchBookByISBN(isbn: String) {
+        viewModelScope.launch {
+            try {
+                val result = bookRepository.searchBookByISBN(isbn)
+
+                result.fold(
+                    onSuccess = { books ->
+                        if (books.isNotEmpty()) {
+                            _uiState.update {
+                                it.copy(
+                                    isLoading = false,
+                                    books = books,
+                                    selectedBook = books.first()
+                                )
+                            }
+                        } else {
+                            // Si no se encontraron libros, crear uno con solo el ISBN
+                            val basicBook = BookModel(title = "", isbn = isbn)
+                            _uiState.update {
+                                it.copy(
+                                    isLoading = false,
+                                    books = listOf(basicBook),
+                                    selectedBook = basicBook
+                                )
+                            }
+                        }
+                    },
+                    onFailure = { error ->
+                        // Si hay un error en la búsqueda, crear libro básico con el ISBN
+                        val basicBook = BookModel(title = "", isbn = isbn)
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                error = "Error al buscar información por ISBN: ${error.message}",
+                                books = listOf(basicBook),
+                                selectedBook = basicBook
+                            )
+                        }
+                    }
+                )
+
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = "Error al buscar información del libro por ISBN: ${e.message}"
                     )
                 }
             }

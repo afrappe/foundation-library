@@ -120,4 +120,67 @@ class TextRecognitionHelperTest {
             assertEquals("Error en el procesamiento de imagen", e.message)
         }
     }
+
+    @Test
+    fun `extraer ISBN de texto vacío devuelve cadena vacía`() {
+        // Caso límite: Texto vacío
+        val result = textRecognitionHelper.extractISBN("")
+        assertEquals("", result)
+    }
+
+    @Test
+    fun `extraer ISBN-13 válido del texto`() {
+        // Caso normal: ISBN-13 con formato estándar
+        val text = "Este libro\nISBN: 978-0-596-52068-7\nAutor: Example"
+        val result = textRecognitionHelper.extractISBN(text)
+        assertEquals("9780596520687", result)
+    }
+
+    @Test
+    fun `extraer ISBN-13 sin guiones del texto`() {
+        // Caso normal: ISBN-13 sin guiones
+        val text = "Este libro\nISBN: 9780596520687\nAutor: Example"
+        val result = textRecognitionHelper.extractISBN(text)
+        assertEquals("9780596520687", result)
+    }
+
+    @Test
+    fun `extraer ISBN-10 válido del texto`() {
+        // Caso normal: ISBN-10 con formato estándar
+        val text = "Este libro\nISBN: 0-596-52068-9\nAutor: Example"
+        val result = textRecognitionHelper.extractISBN(text)
+        assertEquals("0596520689", result)
+    }
+
+    @Test
+    fun `extraer ISBN-10 con X como último dígito`() {
+        // Caso borde: ISBN-10 terminando en X
+        val text = "Este libro\nISBN-10: 043942089X\nAutor: Example"
+        val result = textRecognitionHelper.extractISBN(text)
+        assertEquals("043942089X", result)
+    }
+
+    @Test
+    fun `extraer ISBN sin prefijo ISBN del texto`() {
+        // Caso borde: ISBN sin el prefijo "ISBN:"
+        val text = "Este libro\n978-3-16-148410-0\nAutor: Example"
+        val result = textRecognitionHelper.extractISBN(text)
+        assertEquals("9783161484100", result)
+    }
+
+    @Test
+    fun `extraer ISBN de texto sin ISBN devuelve cadena vacía`() {
+        // Caso límite: Texto sin ISBN
+        val text = "Este es un libro sin ISBN\nAutor: Example\nEditorial: Test"
+        val result = textRecognitionHelper.extractISBN(text)
+        assertEquals("", result)
+    }
+
+    @Test
+    fun `extraer ISBN prioriza ISBN-13 sobre ISBN-10 cuando ambos están presentes`() {
+        // Caso borde: Texto con ambos formatos
+        val text = "ISBN-10: 0596520689\nISBN-13: 978-0-596-52068-7"
+        val result = textRecognitionHelper.extractISBN(text)
+        assertEquals("9780596520687", result)
+    }
 }

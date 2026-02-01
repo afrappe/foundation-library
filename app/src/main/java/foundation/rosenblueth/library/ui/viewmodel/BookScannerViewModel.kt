@@ -10,6 +10,7 @@ import foundation.rosenblueth.library.data.model.CaptureData
 import foundation.rosenblueth.library.data.repository.BookRepository
 import foundation.rosenblueth.library.data.store.CaptureDataStore
 import foundation.rosenblueth.library.util.TextRecognitionHelper
+import foundation.rosenblueth.library.ui.model.ScanMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,6 +32,179 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
     // Estado para la UI
     private val _uiState = MutableStateFlow(BookScannerUiState())
     val uiState: StateFlow<BookScannerUiState> = _uiState.asStateFlow()
+
+    // Estado para el modo de escaneo actual
+    private val _currentScanMode = MutableStateFlow(ScanMode.COVER)
+    val currentScanMode: StateFlow<ScanMode> = _currentScanMode.asStateFlow()
+
+    // Estado para las secciones escaneadas (título, autor, editorial)
+    private val _scannedTitle = MutableStateFlow("")
+    val scannedTitle: StateFlow<String> = _scannedTitle.asStateFlow()
+
+    private val _scannedAuthor = MutableStateFlow("")
+    val scannedAuthor: StateFlow<String> = _scannedAuthor.asStateFlow()
+
+    private val _scannedPublisher = MutableStateFlow("")
+    val scannedPublisher: StateFlow<String> = _scannedPublisher.asStateFlow()
+
+    // Tipo de sección que se está escaneando actualmente
+    private val _currentSectionType = MutableStateFlow<String?>(null)
+    val currentSectionType: StateFlow<String?> = _currentSectionType.asStateFlow()
+
+    /**
+     * Establece el tipo de sección que se va a escanear
+     */
+    fun setCurrentSectionType(sectionType: String?) {
+        _currentSectionType.value = sectionType
+    }
+
+    /**
+     * Actualiza el valor de una sección específica
+     */
+    fun updateSectionValue(sectionType: String, value: String) {
+        when (sectionType) {
+            "TITLE" -> _scannedTitle.value = value
+            "AUTHOR" -> _scannedAuthor.value = value
+            "PUBLISHER" -> _scannedPublisher.value = value
+        }
+    }
+
+    /**
+     * Limpia los valores de las secciones escaneadas
+     */
+    fun clearSectionValues() {
+        _scannedTitle.value = ""
+        _scannedAuthor.value = ""
+        _scannedPublisher.value = ""
+        _currentSectionType.value = null
+    }
+
+    /**
+     * Establece el modo de escaneo actual
+     */
+    fun setScanMode(mode: ScanMode) {
+        _currentScanMode.value = mode
+    }
+
+    /**
+     * Procesa la búsqueda de libro por secciones (título, autor, editorial)
+     * y busca los números de clasificación LC, Dewey y DCU
+     */
+    fun processBookBySections(title: String, author: String, publisher: String) {
+        viewModelScope.launch {
+            try {
+                _uiState.update { it.copy(isLoading = true, error = null) }
+
+                // Buscar libro con la información proporcionada
+                val searchQuery = buildSearchQuery(title, author, publisher)
+
+                if (searchQuery.isNotEmpty()) {
+                    searchBookWithClassifications(title, author, publisher)
+                } else {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            error = "Ingresa al menos el título o el autor del libro"
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = "Error al procesar la búsqueda: ${e.message}"
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Construye la consulta de búsqueda combinando título, autor y editorial
+     */
+    private fun buildSearchQuery(title: String, author: String, publisher: String): String {
+        return listOf(title, author, publisher)
+            .filter { it.isNotBlank() }
+            .joinToString(" ")
+    }
+
+    /**
+     * Busca información del libro incluyendo clasificaciones LC, Dewey y DCU
+     */
+    private fun searchBookWithClassifications(title: String, author: String, publisher: String) {
+        viewModelScope.launch {
+            try {
+                val result = if (title.isNotBlank()) {
+                    bookRepository.searchBookByTitle(title)
+                } else if (author.isNotBlank()) {
+                    bookRepository.searchBookByTitle(author)
+                } else {
+                    bookRepository.searchBookByTitle(publisher)
+                }
+
+                result.fold(
+                    onSuccess = { books ->
+                        if (books.isNotEmpty()) {
+                            // Filtrar por autor si está disponible
+                            val filteredBooks = if (author.isNotBlank()) {
+                                books.filter { book ->
+                                    book.author.contains(author, ignoreCase = true)
+                                }.ifEmpty { books }
+                            } else {
+                                books
+                            }
+
+                            _uiState.update {
+                                it.copy(
+                                    isLoading = false,
+                                    books = filteredBooks,
+                                    selectedBook = filteredBooks.first(),
+                                    bookTitle = title
+                                )
+                            }
+                        } else {
+                            // Crear libro básico con la información proporcionada
+                            val basicBook = BookModel(
+                                title = title.ifBlank { "Libro sin título" },
+                                author = author,
+                                publisher = publisher
+                            )
+                            _uiState.update {
+                                it.copy(
+                                    isLoading = false,
+                                    books = listOf(basicBook),
+                                    selectedBook = basicBook,
+                                    bookTitle = title
+                                )
+                            }
+                        }
+                    },
+                    onFailure = { error ->
+                        val basicBook = BookModel(
+                            title = title.ifBlank { "Libro sin título" },
+                            author = author,
+                            publisher = publisher
+                        )
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                error = "Error al buscar información: ${error.message}",
+                                books = listOf(basicBook),
+                                selectedBook = basicBook
+                            )
+                        }
+                    }
+                )
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = "Error al buscar clasificaciones: ${e.message}"
+                    )
+                }
+            }
+        }
+    }
 
     /**
      * Procesa la imagen capturada para extraer el título y buscar información del libro

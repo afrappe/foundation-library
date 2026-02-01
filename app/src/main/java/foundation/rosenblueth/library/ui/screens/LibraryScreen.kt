@@ -208,7 +208,10 @@ fun LibraryScreen(
         // Diálogo de confirmación de eliminación
         if (showDeleteDialog && bookToDelete != null) {
             AlertDialog(
-                onDismissRequest = { showDeleteDialog = false },
+                onDismissRequest = { 
+                    showDeleteDialog = false
+                    bookToDelete = null
+                },
                 title = { Text("Eliminar libro") },
                 text = { Text("¿Estás seguro de que deseas eliminar '${bookToDelete?.title}' de tu biblioteca?") },
                 confirmButton = {
@@ -225,7 +228,10 @@ fun LibraryScreen(
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showDeleteDialog = false }) {
+                    TextButton(onClick = { 
+                        showDeleteDialog = false
+                        bookToDelete = null
+                    }) {
                         Text("Cancelar")
                     }
                 }

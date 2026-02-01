@@ -18,7 +18,7 @@ data class CaptureData(
     val description: String = "",
     val lcClassification: String = "",  // Library of Congress Classification
     val deweyClassification: String = "",  // Dewey Decimal Classification
-    val dcuClassification: String = "",  // DCU Classification
+    val dcuClassification: String = "",  // DCU/UDC Classification (Universal Decimal Classification, based on the Brussels Classification)
     val captureTimestamp: Long = System.currentTimeMillis()
 ) {
     companion object {

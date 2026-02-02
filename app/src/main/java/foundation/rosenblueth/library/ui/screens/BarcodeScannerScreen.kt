@@ -5,11 +5,8 @@ import android.content.pm.PackageManager
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.annotation.OptIn
 import androidx.camera.core.CameraSelector
-import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
-import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -33,11 +30,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import com.google.mlkit.vision.barcode.BarcodeScanner
-import com.google.mlkit.vision.barcode.BarcodeScannerOptions
-import com.google.mlkit.vision.barcode.BarcodeScanning
-import com.google.mlkit.vision.barcode.common.Barcode
-import com.google.mlkit.vision.common.InputImage
+import foundation.rosenblueth.library.scan.BarcodeAnalyzer
 import foundation.rosenblueth.library.ui.components.ErrorMessage
 import foundation.rosenblueth.library.ui.viewmodel.BookScannerViewModel
 import java.util.concurrent.Executors
@@ -103,18 +96,6 @@ fun BarcodeScannerScreen(
                 // Vista de la cámara con análisis de códigos de barras
                 val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
 
-                // Configurar el escáner de códigos de barras para EAN-13 (ISBN)
-                val barcodeScanner = remember {
-                    val options = BarcodeScannerOptions.Builder()
-                        .setBarcodeFormats(
-                            Barcode.FORMAT_EAN_13,
-                            Barcode.FORMAT_EAN_8,
-                            Barcode.FORMAT_ISBN
-                        )
-                        .build()
-                    BarcodeScanning.getClient(options)
-                }
-
                 AndroidView(
                     factory = { ctx ->
                         val previewView = PreviewView(ctx).apply {
@@ -133,25 +114,23 @@ fun BarcodeScannerScreen(
                                 it.setSurfaceProvider(previewView.surfaceProvider)
                             }
 
-                            // Configurar análisis de imagen para escaneo de códigos
+                            // Configurar análisis de imagen con BarcodeAnalyzer
                             val imageAnalysis = ImageAnalysis.Builder()
                                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                                 .build()
                                 .also { analysis ->
-                                    analysis.setAnalyzer(cameraExecutor) { imageProxy ->
-                                        if (!isProcessing && detectedBarcode == null) {
-                                            processBarcode(
-                                                imageProxy,
-                                                barcodeScanner,
-                                                onBarcodeFound = { barcode ->
-                                                    detectedBarcode = barcode
-                                                    isProcessing = true
-                                                }
-                                            )
-                                        } else {
-                                            imageProxy.close()
-                                        }
-                                    }
+                                    // Usar BarcodeAnalyzer personalizado
+                                    val analyzer = BarcodeAnalyzer(
+                                        onIsbnDetected = { isbn ->
+                                            // Solo actualizar si no se ha detectado ya
+                                            if (detectedBarcode == null && !isProcessing) {
+                                                detectedBarcode = isbn
+                                                isProcessing = true
+                                            }
+                                        },
+                                        minIntervalMs = 2000L // Evitar detecciones repetidas
+                                    )
+                                    analysis.setAnalyzer(cameraExecutor, analyzer)
                                 }
 
                             try {
@@ -240,7 +219,6 @@ fun BarcodeScannerScreen(
                 DisposableEffect(Unit) {
                     onDispose {
                         cameraExecutor.shutdown()
-                        barcodeScanner.close()
                     }
                 }
             }
@@ -306,61 +284,3 @@ private fun ScannerOverlay() {
     }
 }
 
-/**
- * Procesa una imagen para detectar códigos de barras
- */
-@OptIn(ExperimentalGetImage::class)
-private fun processBarcode(
-    imageProxy: ImageProxy,
-    scanner: BarcodeScanner,
-    onBarcodeFound: (String) -> Unit
-) {
-    val mediaImage = imageProxy.image
-    if (mediaImage != null) {
-        val inputImage = InputImage.fromMediaImage(
-            mediaImage,
-            imageProxy.imageInfo.rotationDegrees
-        )
-
-        scanner.process(inputImage)
-            .addOnSuccessListener { barcodes ->
-                for (barcode in barcodes) {
-                    barcode.rawValue?.let { value ->
-                        // Verificar si es un ISBN válido (13 dígitos que empiezan con 978 o 979)
-                        if (isValidISBN(value)) {
-                            onBarcodeFound(value)
-                            return@addOnSuccessListener
-                        }
-                    }
-                }
-            }
-            .addOnFailureListener { e ->
-                Log.e("BarcodeScannerScreen", "Error al procesar código de barras", e)
-            }
-            .addOnCompleteListener {
-                imageProxy.close()
-            }
-    } else {
-        imageProxy.close()
-    }
-}
-
-/**
- * Verifica si el código es un ISBN válido
- */
-private fun isValidISBN(code: String): Boolean {
-    // ISBN-13 comienza con 978 o 979
-    if (code.length == 13 && (code.startsWith("978") || code.startsWith("979"))) {
-        return code.all { it.isDigit() }
-    }
-    // ISBN-10 tiene 10 caracteres
-    if (code.length == 10) {
-        return code.dropLast(1).all { it.isDigit() } &&
-               (code.last().isDigit() || code.last().uppercaseChar() == 'X')
-    }
-    // También aceptar EAN-13 que no sea ISBN pero sea código de libro
-    if (code.length == 13 && code.all { it.isDigit() }) {
-        return true
-    }
-    return false
-}

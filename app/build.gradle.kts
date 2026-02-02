@@ -89,10 +89,10 @@ dependencies {
     implementation("androidx.camera:camera-view:1.3.1")
 
     // ML Kit for text recognition
-    implementation("com.google.mlkit:text-recognition:16.0.0")
+    implementation("com.google.mlkit:text-recognition:16.0.1")
 
     // ML Kit for barcode scanning (ISBN)
-    implementation("com.google.mlkit:barcode-scanning:17.2.0")
+    implementation("com.google.mlkit:barcode-scanning:17.3.0")
 
     // Retrofit for network calls
     implementation("com.squareup.retrofit2:retrofit:2.10.0")

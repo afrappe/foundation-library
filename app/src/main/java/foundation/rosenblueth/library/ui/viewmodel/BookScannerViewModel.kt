@@ -9,6 +9,7 @@ import foundation.rosenblueth.library.data.model.BookModel
 import foundation.rosenblueth.library.data.model.CaptureData
 import foundation.rosenblueth.library.data.repository.BookRepository
 import foundation.rosenblueth.library.data.store.CaptureDataStore
+import foundation.rosenblueth.library.network.OpenLibraryService
 import foundation.rosenblueth.library.util.TextRecognitionHelper
 import foundation.rosenblueth.library.ui.model.ScanMode
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -421,16 +422,36 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
                 result.fold(
                     onSuccess = { books ->
                         if (books.isNotEmpty()) {
+                            // Buscar clasificaciones adicionales
+                            val classifications = OpenLibraryService.fetchClassifications(isbn)
+
+                            // Actualizar el libro con las clasificaciones si se encontraron
+                            val updatedBook = if (classifications != null) {
+                                books.first().copy(
+                                    lcClassification = classifications.lcClassification ?: books.first().lcClassification,
+                                    deweyClassification = classifications.dewey ?: books.first().deweyClassification,
+                                    dcuClassification = classifications.cdu ?: books.first().dcuClassification
+                                )
+                            } else {
+                                books.first()
+                            }
+
                             _uiState.update {
                                 it.copy(
                                     isLoading = false,
                                     books = books,
-                                    selectedBook = books.first()
+                                    selectedBook = updatedBook
                                 )
                             }
                         } else {
                             // Si no se encontraron libros, crear uno con solo el ISBN
-                            val basicBook = createBasicBookWithISBN(isbn)
+                            // pero buscar clasificaciones
+                            val classifications = OpenLibraryService.fetchClassifications(isbn)
+                            val basicBook = createBasicBookWithISBN(isbn).copy(
+                                lcClassification = classifications?.lcClassification ?: "",
+                                deweyClassification = classifications?.dewey ?: "",
+                                dcuClassification = classifications?.cdu ?: ""
+                            )
                             _uiState.update {
                                 it.copy(
                                     isLoading = false,
@@ -442,14 +463,22 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
                     },
                     onFailure = { error ->
                         // Si hay un error en la búsqueda, crear libro básico con el ISBN
-                        val basicBook = createBasicBookWithISBN(isbn)
-                        _uiState.update {
-                            it.copy(
-                                isLoading = false,
-                                error = "Error al buscar información por ISBN: ${error.message}",
-                                books = listOf(basicBook),
-                                selectedBook = basicBook
+                        // pero intentar obtener clasificaciones
+                        viewModelScope.launch {
+                            val classifications = OpenLibraryService.fetchClassifications(isbn)
+                            val basicBook = createBasicBookWithISBN(isbn).copy(
+                                lcClassification = classifications?.lcClassification ?: "",
+                                deweyClassification = classifications?.dewey ?: "",
+                                dcuClassification = classifications?.cdu ?: ""
                             )
+                            _uiState.update {
+                                it.copy(
+                                    isLoading = false,
+                                    error = "Error al buscar información por ISBN: ${error.message}",
+                                    books = listOf(basicBook),
+                                    selectedBook = basicBook
+                                )
+                            }
                         }
                     }
                 )

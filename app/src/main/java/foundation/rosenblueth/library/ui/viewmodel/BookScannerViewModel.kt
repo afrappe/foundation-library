@@ -173,10 +173,48 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
 
     /**
      * Busca información del libro incluyendo clasificaciones LC, Dewey y DCU
+     * usando el servicio de búsqueda mejorado
      */
     private fun searchBookWithClassifications(title: String, author: String, publisher: String) {
         viewModelScope.launch {
             try {
+                Log.d("BookScannerVM", "=== BÚSQUEDA POR SECCIONES CON CLASIFICACIONES MEJORADAS ===")
+                Log.d("BookScannerVM", "Título: '$title', Autor: '$author', Editorial: '$publisher'")
+
+                // PRIMERA OPCIÓN: Usar EnhancedBookSearchService para búsqueda por título/autor
+                val completeBookInfo = if (title.isNotBlank()) {
+                    EnhancedBookSearchService.searchByTitleAuthor(title, author.ifBlank { null })
+                } else {
+                    null
+                }
+
+                if (completeBookInfo != null) {
+                    Log.d("BookScannerVM", "✓ Encontrado con clasificaciones mejoradas")
+                    Log.d("BookScannerVM", "Fuentes: ${completeBookInfo.sources.joinToString(", ")}")
+                    Log.d("BookScannerVM", "Clasificaciones: ${completeBookInfo.getClassificationSummary()}")
+
+                    // Combinar con información de editorial si no está presente
+                    val finalBook = if (completeBookInfo.finalBook.publisher.isBlank() && publisher.isNotBlank()) {
+                        completeBookInfo.finalBook.copy(publisher = publisher)
+                    } else {
+                        completeBookInfo.finalBook
+                    }
+
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            books = listOf(finalBook),
+                            selectedBook = finalBook,
+                            bookTitle = title,
+                            successMessage = "Libro encontrado con clasificaciones de ${completeBookInfo.sources.size} fuente(s)"
+                        )
+                    }
+                    return@launch
+                }
+
+                // FALLBACK: Usar método tradicional de BookRepository
+                Log.d("BookScannerVM", "Fallback a búsqueda tradicional por título")
+
                 val result = if (title.isNotBlank()) {
                     bookRepository.searchBookByTitle(title)
                 } else if (author.isNotBlank()) {
@@ -197,47 +235,47 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
                                 books
                             }
 
+                            // Intentar obtener clasificaciones adicionales para el primer libro
+                            val bookWithClassifications = if (filteredBooks.first().isbn.isNotBlank()) {
+                                // Si el libro tiene ISBN, buscar clasificaciones por ISBN
+                                val classifications = OpenLibraryService.fetchClassifications(filteredBooks.first().isbn)
+                                filteredBooks.first().copy(
+                                    lcClassification = classifications?.lcClassification ?: filteredBooks.first().lcClassification,
+                                    deweyClassification = classifications?.dewey ?: filteredBooks.first().deweyClassification,
+                                    dcuClassification = classifications?.cdu ?: filteredBooks.first().dcuClassification
+                                )
+                            } else {
+                                // Sin ISBN, intentar búsqueda por título/autor si el título no está vacío
+                                val enhancedInfo = if (filteredBooks.first().title.isNotBlank()) {
+                                    EnhancedBookSearchService.searchByTitleAuthor(
+                                        title = filteredBooks.first().title,
+                                        author = filteredBooks.first().author.ifBlank { null }
+                                    )
+                                } else {
+                                    null
+                                }
+                                enhancedInfo?.finalBook ?: filteredBooks.first()
+                            }
+
                             _uiState.update {
                                 it.copy(
                                     isLoading = false,
-                                    books = filteredBooks,
-                                    selectedBook = filteredBooks.first(),
+                                    books = listOf(bookWithClassifications),
+                                    selectedBook = bookWithClassifications,
                                     bookTitle = title
                                 )
                             }
                         } else {
-                            // Crear libro básico con la información proporcionada
-                            val basicBook = BookModel(
-                                title = title.ifBlank { "Libro sin título" },
-                                author = author,
-                                publisher = publisher
-                            )
-                            _uiState.update {
-                                it.copy(
-                                    isLoading = false,
-                                    books = listOf(basicBook),
-                                    selectedBook = basicBook,
-                                    bookTitle = title
-                                )
-                            }
+                            // Crear libro básico pero intentar obtener clasificaciones
+                            createEnhancedBasicBook(title, author, publisher)
                         }
                     },
                     onFailure = { error ->
-                        val basicBook = BookModel(
-                            title = title.ifBlank { "Libro sin título" },
-                            author = author,
-                            publisher = publisher
-                        )
-                        _uiState.update {
-                            it.copy(
-                                isLoading = false,
-                                error = "Error al buscar información: ${error.message}",
-                                books = listOf(basicBook),
-                                selectedBook = basicBook
-                            )
-                        }
+                        // En caso de error, crear libro básico con clasificaciones si es posible
+                        createEnhancedBasicBook(title, author, publisher, error.message)
                     }
                 )
+
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(
@@ -246,6 +284,54 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
                     )
                 }
             }
+        }
+    }
+
+    /**
+     * Crea un libro básico pero intenta obtener clasificaciones usando el servicio mejorado
+     */
+    private suspend fun createEnhancedBasicBook(
+        title: String,
+        author: String,
+        publisher: String,
+        errorMessage: String? = null
+    ) {
+        Log.d("BookScannerVM", "Creando libro básico con clasificaciones mejoradas")
+
+        // Intentar obtener clasificaciones aunque no tengamos información completa
+        val enhancedClassifications = if (title.isNotBlank()) {
+            EnhancedBookSearchService.searchByTitleAuthor(
+                title = title,
+                author = author.ifBlank { null }
+            )
+        } else {
+            null
+        }
+
+        val basicBook = BookModel(
+            title = title.ifBlank { "Libro sin título" },
+            author = author,
+            publisher = publisher,
+            lcClassification = enhancedClassifications?.finalBook?.lcClassification ?: "",
+            deweyClassification = enhancedClassifications?.finalBook?.deweyClassification ?: "",
+            dcuClassification = enhancedClassifications?.finalBook?.dcuClassification ?: ""
+        )
+
+        val successMsg = if (enhancedClassifications != null) {
+            "Clasificaciones obtenidas de: ${enhancedClassifications.sources.joinToString(", ")}"
+        } else {
+            null
+        }
+
+        _uiState.update {
+            it.copy(
+                isLoading = false,
+                error = errorMessage?.let { msg -> "Búsqueda limitada: $msg" },
+                books = listOf(basicBook),
+                selectedBook = basicBook,
+                bookTitle = title,
+                successMessage = successMsg
+            )
         }
     }
 
@@ -416,27 +502,69 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
 
     /**
      * Busca información del libro usando el ISBN reconocido.
-     * Usa múltiples fuentes en cascada para máxima tasa de éxito.
+     * Usa búsqueda exhaustiva en múltiples fuentes para máxima obtención de clasificaciones.
      */
     private fun searchBookByISBN(isbn: String) {
         viewModelScope.launch {
             try {
-                // PRIMERA OPCIÓN: Usar ISBNBookSearchService (4 fuentes especializadas)
+                _uiState.update { it.copy(isLoading = true, error = null) }
+
+                Log.d("BookScannerVM", "=== INICIANDO BÚSQUEDA EXHAUSTIVA PARA ISBN: $isbn ===")
+
+                // NUEVA ESTRATEGIA: Usar EnhancedBookSearchService para búsqueda completa
+                // Esto incluye información del libro + clasificaciones de múltiples fuentes
+                val completeBookInfo = EnhancedBookSearchService.searchCompleteBookInfoParallel(isbn)
+
+                if (completeBookInfo != null) {
+                    Log.d("BookScannerVM", "✓ Búsqueda exhaustiva exitosa")
+                    Log.d("BookScannerVM", "Libro encontrado: ${completeBookInfo.finalBook.title}")
+                    Log.d("BookScannerVM", "Estrategia: ${completeBookInfo.searchStrategy}")
+                    Log.d("BookScannerVM", "Fuentes consultadas: ${completeBookInfo.sources.joinToString(", ")}")
+                    Log.d("BookScannerVM", "Clasificaciones finales:")
+                    Log.d("BookScannerVM", "  - LC: '${completeBookInfo.finalBook.lcClassification}'")
+                    Log.d("BookScannerVM", "  - Dewey: '${completeBookInfo.finalBook.deweyClassification}'")
+                    Log.d("BookScannerVM", "  - UDC: '${completeBookInfo.finalBook.dcuClassification}'")
+
+                    // Mostrar resumen de clasificaciones adicionales
+                    completeBookInfo.enhancedClassifications?.let { enhanced ->
+                        if (enhanced.lcClassification.size > 1) {
+                            Log.d("BookScannerVM", "  - LC adicionales: ${enhanced.lcClassification.drop(1)}")
+                        }
+                        if (enhanced.deweyClassification.size > 1) {
+                            Log.d("BookScannerVM", "  - Dewey adicionales: ${enhanced.deweyClassification.drop(1)}")
+                        }
+                        if (enhanced.subjectHeadings.isNotEmpty()) {
+                            Log.d("BookScannerVM", "  - Materias: ${enhanced.subjectHeadings.take(3)}")
+                        }
+                    }
+
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            books = listOf(completeBookInfo.finalBook),
+                            selectedBook = completeBookInfo.finalBook,
+                            bookTitle = completeBookInfo.finalBook.title,
+                            successMessage = "Libro encontrado con clasificaciones de ${completeBookInfo.sources.size} fuente(s)"
+                        )
+                    }
+                    return@launch
+                }
+
+                // FALLBACK: Usar método original si el nuevo falla
+                Log.d("BookScannerVM", "Búsqueda exhaustiva falló, usando método de fallback...")
+
                 val bookFromISBNService = ISBNBookSearchService.searchBookByISBN(isbn)
 
                 if (bookFromISBNService != null) {
-                    // Éxito: libro encontrado con datos completos
-                    Log.d("BookScannerVM", "Libro encontrado: ${bookFromISBNService.title}")
-                    Log.d("BookScannerVM", "Clasificaciones iniciales - LC: '${bookFromISBNService.lcClassification}', Dewey: '${bookFromISBNService.deweyClassification}', DCU: '${bookFromISBNService.dcuClassification}'")
+                    Log.d("BookScannerVM", "✓ Fallback exitoso con información básica")
 
                     // Intentar enriquecer con clasificaciones adicionales si faltan
                     val enrichedBook = if (bookFromISBNService.lcClassification.isBlank() ||
                                            bookFromISBNService.deweyClassification.isBlank()) {
                         Log.d("BookScannerVM", "Buscando clasificaciones adicionales...")
                         val classifications = OpenLibraryService.fetchClassifications(isbn)
-                        Log.d("BookScannerVM", "Clasificaciones adicionales - LC: '${classifications?.lcClassification}', Dewey: '${classifications?.dewey}', DCU: '${classifications?.cdu}'")
 
-                        val enriched = bookFromISBNService.copy(
+                        bookFromISBNService.copy(
                             lcClassification = bookFromISBNService.lcClassification.ifBlank {
                                 classifications?.lcClassification ?: ""
                             },
@@ -447,10 +575,7 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
                                 classifications?.cdu ?: ""
                             }
                         )
-                        Log.d("BookScannerVM", "Libro enriquecido - LC: '${enriched.lcClassification}', Dewey: '${enriched.deweyClassification}', DCU: '${enriched.dcuClassification}'")
-                        enriched
                     } else {
-                        Log.d("BookScannerVM", "Libro ya tiene clasificaciones completas")
                         bookFromISBNService
                     }
 
@@ -459,13 +584,13 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
                             isLoading = false,
                             books = listOf(enrichedBook),
                             selectedBook = enrichedBook,
-                            bookTitle = enrichedBook.title  // Asegurar que el título se actualice en la UI
+                            bookTitle = enrichedBook.title
                         )
                     }
                     return@launch
                 }
 
-                // SEGUNDA OPCIÓN: Usar BookRepository (LOC API tradicional)
+                // FALLBACK FINAL: Usar BookRepository + clasificaciones
                 val result = bookRepository.searchBookByISBN(isbn)
 
                 result.fold(
@@ -474,7 +599,6 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
                             // Buscar clasificaciones adicionales
                             val classifications = OpenLibraryService.fetchClassifications(isbn)
 
-                            // Actualizar el libro con las clasificaciones si se encontraron
                             val updatedBook = if (classifications != null) {
                                 books.first().copy(
                                     lcClassification = classifications.lcClassification ?: books.first().lcClassification,
@@ -490,21 +614,20 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
                                     isLoading = false,
                                     books = books,
                                     selectedBook = updatedBook,
-                                    bookTitle = updatedBook.title  // Asegurar que el título se actualice
+                                    bookTitle = updatedBook.title
                                 )
                             }
                         } else {
-                            // No se encontraron libros: crear uno básico con ISBN
                             createBasicBookWithISBNAndClassifications(isbn)
                         }
                     },
                     onFailure = { error ->
-                        // Si hay un error en la búsqueda, crear libro básico con el ISBN
                         createBasicBookWithISBNAndClassifications(isbn, error.message)
                     }
                 )
 
             } catch (e: Exception) {
+                Log.e("BookScannerVM", "Error en búsqueda exhaustiva", e)
                 _uiState.update {
                     it.copy(
                         isLoading = false,
@@ -516,22 +639,43 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
     }
 
     /**
-     * Crea un libro básico con ISBN y busca clasificaciones.
+     * Crea un libro básico con ISBN y busca clasificaciones usando servicios mejorados.
      */
     private suspend fun createBasicBookWithISBNAndClassifications(isbn: String, errorMessage: String? = null) {
-        val classifications = OpenLibraryService.fetchClassifications(isbn)
-        val basicBook = createBasicBookWithISBN(isbn).copy(
-            lcClassification = classifications?.lcClassification ?: "",
-            deweyClassification = classifications?.dewey ?: "",
-            dcuClassification = classifications?.cdu ?: ""
-        )
+        Log.d("BookScannerVM", "Creando libro básico con clasificaciones mejoradas para ISBN: $isbn")
+
+        // Intentar obtener solo clasificaciones aunque no tengamos información del libro
+        val enhancedInfo = EnhancedBookSearchService.searchCompleteBookInfo(isbn)
+
+        val basicBook = if (enhancedInfo != null) {
+            Log.d("BookScannerVM", "Clasificaciones obtenidas de fuentes mejoradas")
+            enhancedInfo.finalBook.copy(
+                title = if (enhancedInfo.finalBook.title == "Libro no identificado") "Libro sin título" else enhancedInfo.finalBook.title
+            )
+        } else {
+            // Fallback a OpenLibrary únicamente
+            val classifications = OpenLibraryService.fetchClassifications(isbn)
+            BookModel(
+                title = "Libro sin título",
+                isbn = isbn,
+                lcClassification = classifications?.lcClassification ?: "",
+                deweyClassification = classifications?.dewey ?: "",
+                dcuClassification = classifications?.cdu ?: ""
+            )
+        }
+
+        val successMsg = enhancedInfo?.let {
+            "Clasificaciones de: ${it.sources.joinToString(", ")}"
+        }
+
         _uiState.update {
             it.copy(
                 isLoading = false,
                 error = errorMessage?.let { msg -> "No se encontró información completa: $msg" },
                 books = listOf(basicBook),
                 selectedBook = basicBook,
-                bookTitle = basicBook.title  // Asegurar que el título se actualice
+                bookTitle = basicBook.title,
+                successMessage = successMsg
             )
         }
     }
@@ -584,7 +728,7 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
                             _uiState.update {
                                 it.copy(
                                     isLoading = false,
-                                    successMessage = "Libro enviado correctamente al backend y guardado en la biblioteca"
+                                    successMessage = "✓ Libro guardado en Mi Biblioteca correctamente"
                                 )
                             }
                         },

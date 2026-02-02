@@ -6,7 +6,9 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.LibraryAdd
 import androidx.compose.material.icons.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
@@ -89,43 +91,21 @@ fun ResultsScreen(
                 message = uiState.error ?: "Error desconocido",
                 onRetry = onNewScan
             )
-        } else if (uiState.successMessage != null) {
-            SuccessMessage(message = uiState.successMessage ?: "")
-
-            // Botones para volver a escanear o ir a la biblioteca después de éxito
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(
-                    onClick = onNavigateToLibrary,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(Icons.Default.LibraryBooks, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Ver Mi Biblioteca")
-                }
-                
-                Button(
-                    onClick = {
-                        viewModel.resetScanProcess()
-                        onNewScan()
-                    },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Escanear otro libro")
-                }
-            }
         } else {
-            // Mostrar información del libro
+            // Mostrar mensaje de éxito si existe
+            if (uiState.successMessage != null) {
+                SuccessMessage(message = uiState.successMessage ?: "")
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            // Siempre mostrar información del libro si existe
             BookInformationContent(
                 bookTitle = uiState.bookTitle,
                 selectedBook = uiState.selectedBook,
                 onTitleUpdate = viewModel::updateBookTitle,
                 onSendToBackend = viewModel::sendBookToBackend,
-                errorMessage = uiState.error
+                errorMessage = uiState.error,
+                successMessage = uiState.successMessage
             )
         }
     }
@@ -140,7 +120,8 @@ private fun BookInformationContent(
     selectedBook: BookModel?,
     onTitleUpdate: (String) -> Unit,
     onSendToBackend: () -> Unit,
-    errorMessage: String?
+    errorMessage: String?,
+    successMessage: String? = null
 ) {
     var isEditingTitle by remember { mutableStateOf(false) }
     var editedTitle by remember { mutableStateOf(bookTitle) }
@@ -275,14 +256,21 @@ private fun BookInformationContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Botón para enviar al backend
+        // Botón para agregar a la biblioteca
+        val isAlreadySaved = successMessage?.contains("guardado") == true
+        val buttonText = if (isAlreadySaved) "✓ Ya está en Mi Biblioteca" else "Agregar a Mi Biblioteca"
+
         Button(
             onClick = onSendToBackend,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isAlreadySaved
         ) {
-            Icon(Icons.Default.Send, contentDescription = null)
+            Icon(
+                if (isAlreadySaved) Icons.Default.Check else Icons.Default.LibraryAdd,
+                contentDescription = null
+            )
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Enviar al catálogo")
+            Text(buttonText)
         }
     }
 }

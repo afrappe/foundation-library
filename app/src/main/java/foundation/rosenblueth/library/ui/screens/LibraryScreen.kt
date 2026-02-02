@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
+import android.util.Log
 import foundation.rosenblueth.library.data.model.CaptureData
 import foundation.rosenblueth.library.data.store.CaptureDataStore
 import foundation.rosenblueth.library.util.CSVExporter
@@ -194,7 +195,7 @@ fun LibraryScreen(
                     items(capturedBooks, key = { it.id }) { book ->
                         BookListItem(
                             book = book,
-                            onBookClick = { onBookSelected?.invoke(book) },
+                            onClick = { onBookSelected?.invoke(book) },
                             onDeleteClick = {
                                 bookToDelete = book
                                 showDeleteDialog = true
@@ -260,13 +261,16 @@ fun LibraryScreen(
 @Composable
 private fun BookListItem(
     book: CaptureData,
-    onBookClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onDeleteClick: () -> Unit,
+    onClick: () -> Unit
 ) {
+    // Log para verificar las clasificaciones
+    Log.d("LibraryScreen", "Mostrando libro: ${book.title}, LC='${book.lcClassification}', Dewey='${book.deweyClassification}', DCU='${book.dcuClassification}'")
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onBookClick() }
+            .clickable { onClick() }
     ) {
         Row(
             modifier = Modifier

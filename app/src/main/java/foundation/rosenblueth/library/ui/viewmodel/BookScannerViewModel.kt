@@ -2,6 +2,7 @@ package foundation.rosenblueth.library.ui.viewmodel
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -9,6 +10,8 @@ import foundation.rosenblueth.library.data.model.BookModel
 import foundation.rosenblueth.library.data.model.CaptureData
 import foundation.rosenblueth.library.data.repository.BookRepository
 import foundation.rosenblueth.library.data.store.CaptureDataStore
+import foundation.rosenblueth.library.network.EnhancedBookSearchService
+import foundation.rosenblueth.library.network.ISBNBookSearchService
 import foundation.rosenblueth.library.network.OpenLibraryService
 import foundation.rosenblueth.library.util.TextRecognitionHelper
 import foundation.rosenblueth.library.ui.model.ScanMode
@@ -412,11 +415,57 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
     }
 
     /**
-     * Busca información del libro usando el ISBN reconocido
+     * Busca información del libro usando el ISBN reconocido.
+     * Usa múltiples fuentes en cascada para máxima tasa de éxito.
      */
     private fun searchBookByISBN(isbn: String) {
         viewModelScope.launch {
             try {
+                // PRIMERA OPCIÓN: Usar ISBNBookSearchService (4 fuentes especializadas)
+                val bookFromISBNService = ISBNBookSearchService.searchBookByISBN(isbn)
+
+                if (bookFromISBNService != null) {
+                    // Éxito: libro encontrado con datos completos
+                    Log.d("BookScannerVM", "Libro encontrado: ${bookFromISBNService.title}")
+                    Log.d("BookScannerVM", "Clasificaciones iniciales - LC: '${bookFromISBNService.lcClassification}', Dewey: '${bookFromISBNService.deweyClassification}', DCU: '${bookFromISBNService.dcuClassification}'")
+
+                    // Intentar enriquecer con clasificaciones adicionales si faltan
+                    val enrichedBook = if (bookFromISBNService.lcClassification.isBlank() ||
+                                           bookFromISBNService.deweyClassification.isBlank()) {
+                        Log.d("BookScannerVM", "Buscando clasificaciones adicionales...")
+                        val classifications = OpenLibraryService.fetchClassifications(isbn)
+                        Log.d("BookScannerVM", "Clasificaciones adicionales - LC: '${classifications?.lcClassification}', Dewey: '${classifications?.dewey}', DCU: '${classifications?.cdu}'")
+
+                        val enriched = bookFromISBNService.copy(
+                            lcClassification = bookFromISBNService.lcClassification.ifBlank {
+                                classifications?.lcClassification ?: ""
+                            },
+                            deweyClassification = bookFromISBNService.deweyClassification.ifBlank {
+                                classifications?.dewey ?: ""
+                            },
+                            dcuClassification = bookFromISBNService.dcuClassification.ifBlank {
+                                classifications?.cdu ?: ""
+                            }
+                        )
+                        Log.d("BookScannerVM", "Libro enriquecido - LC: '${enriched.lcClassification}', Dewey: '${enriched.deweyClassification}', DCU: '${enriched.dcuClassification}'")
+                        enriched
+                    } else {
+                        Log.d("BookScannerVM", "Libro ya tiene clasificaciones completas")
+                        bookFromISBNService
+                    }
+
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            books = listOf(enrichedBook),
+                            selectedBook = enrichedBook,
+                            bookTitle = enrichedBook.title  // Asegurar que el título se actualice en la UI
+                        )
+                    }
+                    return@launch
+                }
+
+                // SEGUNDA OPCIÓN: Usar BookRepository (LOC API tradicional)
                 val result = bookRepository.searchBookByISBN(isbn)
 
                 result.fold(
@@ -440,46 +489,18 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
                                 it.copy(
                                     isLoading = false,
                                     books = books,
-                                    selectedBook = updatedBook
+                                    selectedBook = updatedBook,
+                                    bookTitle = updatedBook.title  // Asegurar que el título se actualice
                                 )
                             }
                         } else {
-                            // Si no se encontraron libros, crear uno con solo el ISBN
-                            // pero buscar clasificaciones
-                            val classifications = OpenLibraryService.fetchClassifications(isbn)
-                            val basicBook = createBasicBookWithISBN(isbn).copy(
-                                lcClassification = classifications?.lcClassification ?: "",
-                                deweyClassification = classifications?.dewey ?: "",
-                                dcuClassification = classifications?.cdu ?: ""
-                            )
-                            _uiState.update {
-                                it.copy(
-                                    isLoading = false,
-                                    books = listOf(basicBook),
-                                    selectedBook = basicBook
-                                )
-                            }
+                            // No se encontraron libros: crear uno básico con ISBN
+                            createBasicBookWithISBNAndClassifications(isbn)
                         }
                     },
                     onFailure = { error ->
                         // Si hay un error en la búsqueda, crear libro básico con el ISBN
-                        // pero intentar obtener clasificaciones
-                        viewModelScope.launch {
-                            val classifications = OpenLibraryService.fetchClassifications(isbn)
-                            val basicBook = createBasicBookWithISBN(isbn).copy(
-                                lcClassification = classifications?.lcClassification ?: "",
-                                deweyClassification = classifications?.dewey ?: "",
-                                dcuClassification = classifications?.cdu ?: ""
-                            )
-                            _uiState.update {
-                                it.copy(
-                                    isLoading = false,
-                                    error = "Error al buscar información por ISBN: ${error.message}",
-                                    books = listOf(basicBook),
-                                    selectedBook = basicBook
-                                )
-                            }
-                        }
+                        createBasicBookWithISBNAndClassifications(isbn, error.message)
                     }
                 )
 
@@ -491,6 +512,27 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
                     )
                 }
             }
+        }
+    }
+
+    /**
+     * Crea un libro básico con ISBN y busca clasificaciones.
+     */
+    private suspend fun createBasicBookWithISBNAndClassifications(isbn: String, errorMessage: String? = null) {
+        val classifications = OpenLibraryService.fetchClassifications(isbn)
+        val basicBook = createBasicBookWithISBN(isbn).copy(
+            lcClassification = classifications?.lcClassification ?: "",
+            deweyClassification = classifications?.dewey ?: "",
+            dcuClassification = classifications?.cdu ?: ""
+        )
+        _uiState.update {
+            it.copy(
+                isLoading = false,
+                error = errorMessage?.let { msg -> "No se encontró información completa: $msg" },
+                books = listOf(basicBook),
+                selectedBook = basicBook,
+                bookTitle = basicBook.title  // Asegurar que el título se actualice
+            )
         }
     }
 
@@ -535,6 +577,8 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
                         onSuccess = {
                             // Guardar en la biblioteca local
                             val captureData = CaptureData.fromBookModel(book)
+                            Log.d("BookScannerVM", "Guardando libro: ${captureData.title}")
+                            Log.d("BookScannerVM", "Clasificaciones al guardar - LC: '${captureData.lcClassification}', Dewey: '${captureData.deweyClassification}', DCU: '${captureData.dcuClassification}'")
                             captureDataStore?.saveCapturedBook(captureData)
                             
                             _uiState.update {
@@ -590,6 +634,14 @@ open class BookScannerViewModel(private val appContext: Context? = null) : ViewM
             }
             throw IllegalArgumentException("Unknown ViewModel class")
         }
+    }
+
+    /**
+     * Función de debug para probar el reconocimiento de ISBN directamente
+     */
+    fun debugSearchISBN(isbn: String) {
+        Log.d("BookScannerVM", "=== DEBUG: Iniciando búsqueda de ISBN: $isbn ===")
+        searchBookByISBN(isbn)
     }
 }
 
